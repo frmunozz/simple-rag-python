@@ -1,0 +1,49 @@
+services:
+  rag-api:
+    container_name: rag-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    env_file:
+      - .env
+    volumes:
+      - .:/rag-api
+    working_dir: /rag-api
+    command: uvicorn app.api:app --host 0.0.0.0 --port 8008 --reload --log-level info --log-config uvicorn_log_conf.yml
+    depends_on:
+      - rag-chroma
+    healthcheck:
+      # healtcheck to the endpopint /health
+      test: ["CMD", "curl", "--fail", "http://0.0.0.0:8008/health"]
+      interval: 30s
+      retries: 2
+      start_period: 5s
+      timeout: 5s
+    logging:
+      driver: "json-file"
+      options:
+          max-size: "10m"
+          max-file: "3"
+
+  # Vector database (persistent storage)
+  rag-chroma:
+    container_name: rag-chroma
+    image: chromadb/chroma:0.4.24
+    ports:
+      - 8000:8000
+    volumes:
+      - ./chroma_data:/chroma/chroma
+      - ./uvicorn_log_conf.yml:/chroma/chromadb/log_config.yml
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+    logging:
+      driver: "json-file"
+      options:
+          max-size: "10m"
+          max-file: "3"
+
+volumes:
+  chroma_data:
