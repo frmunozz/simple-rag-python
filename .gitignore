@@ -195,3 +195,6 @@ cython_debug/
 
 # ignore the pyenv version file
 .python-version
+
+# ignore sqlite3 files
+*.sqlite3
