@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # load the document
-    #
+    # expose general fastAPI metrics
+    global instrumentator
+    instrumentator.expose(app)
     yield
     # close stuff
     #
@@ -20,6 +22,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+instrumentator = Instrumentator().instrument(app)
 
 @app.get("/health")
 async def health():

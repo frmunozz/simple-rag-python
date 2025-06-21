@@ -8,3 +8,4 @@ pytest
 httpx
 pytest-asyncio
 pyyaml
+prometheus_fastapi_instrumentator
