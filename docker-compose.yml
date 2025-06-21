@@ -14,6 +14,7 @@ services:
     command: uvicorn app.api:app --host 0.0.0.0 --port 8008 --reload --log-level info --log-config uvicorn_log_conf.yml
     depends_on:
       - rag-chroma
+      - rag-api-ollama
     healthcheck:
       # healtcheck to the endpopint /health
       test: ["CMD", "curl", "--fail", "http://0.0.0.0:8008/health"]
@@ -45,5 +46,22 @@ services:
           max-size: "10m"
           max-file: "3"
 
+  rag-api-ollama:
+    container_name: rag-api-ollama
+    image: ollama/ollama:latest
+    ports:
+      - "11535:11434"  # Ollama's default port
+    volumes:
+      - ./ollama_data:/root/.ollama  # Persist downloaded models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # Use GPU if available
+              capabilities: [gpu]
+
+
 volumes:
   chroma_data:
+  ollama_data:
