@@ -17,6 +17,61 @@ It provides endpoints for PDF ingestion and question answering over the ingested
 
 ## Quickstart
 
+### Configuration
+
+Settings are managed via environment variables and `.env` file.  
+See [`app/settings.py`](app/settings.py) for all options.
+
+Key settings:
+- **Provider:** `ollama` (default) or `openai`
+- **PDF path:** Default PDF at `pdfs/thinkpython2.pdf`
+- **Ollama/OpenAI models:** Set model names and API keys as needed
+- **Langfuse:** Set `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` in `.env`
+
+You can copy `.env.example` to `.env` and fill in your own values:
+
+```bash
+cp .env.example .env
+```
+
+**Key variables:**
+
+- `PROVIDER` — Choose `ollama` or `openai` for LLM and embedding provider.
+- `ENABLE_METRICS` — Set to `true` to enable Prometheus metrics endpoint.
+- `TEXT_SPLITTER__CHUNK_SIZE` — Number of characters per text chunk (default: 500).
+- `TEXT_SPLITTER__CHUNK_OVERLAP` — Overlap between chunks (default: 50).
+- `LANGFUSE__PUBLIC_KEY`, `LANGFUSE__SECRET_KEY`, `LANGFUSE__HOST` — [Langfuse](https://langfuse.com/) tracing credentials.
+- `OLLAMA__HOST`, `OLLAMA__EMBEDDING_MODEL`, `OLLAMA__CHAT_MODEL`, `OLLAMA__TEMPERATURE` — Ollama settings.
+- `OPENAI__API_KEY`, `OPENAI__EMBEDDING_MODEL`, `OPENAI__CHAT_MODEL`, `OPENAI__TEMPERATURE` — OpenAI settings.
+
+**Example:**
+
+```env
+PROVIDER=ollama
+ENABLE_METRICS=true
+
+TEXT_SPLITTER__CHUNK_SIZE=500
+TEXT_SPLITTER__CHUNK_OVERLAP=50
+
+LANGFUSE__PUBLIC_KEY=your-public-key
+LANGFUSE__SECRET_KEY=your-secret-key
+LANGFUSE__HOST=https://us.cloud.langfuse.com
+
+OLLAMA__HOST=http://rag-api-ollama:11434
+OLLAMA__EMBEDDING_MODEL=nomic-embed-text
+OLLAMA__CHAT_MODEL=llama3:8b
+OLLAMA__TEMPERATURE=0.5
+
+OPENAI__API_KEY=your-openai-key
+OPENAI__EMBEDDING_MODEL=text-embedding-ada-002
+OPENAI__CHAT_MODEL=gpt-4
+OPENAI__TEMPERATURE=0.5
+```
+
+See [`.env.example`](.env.example) for all available options.
+
+---
+
 ### First time setup
 
 ```bash
@@ -28,6 +83,8 @@ docker compose exec rag-api-ollama ollama pull llama3:8b
 ### Run services
 
 #### Docker compose
+
+Make sure to update the .env variable OLLAMA__HOST to `http://rag-api-ollama:11434`. Then run:
 
 ```bash
 docker compose up
@@ -99,61 +156,6 @@ Note: Depending on your local configuration of Docker, you may need to remove or
     ]
   }
   ```
-
----
-
-## Configuration
-
-Settings are managed via environment variables and `.env` file.  
-See [`app/settings.py`](app/settings.py) for all options.
-
-Key settings:
-- **Provider:** `ollama` (default) or `openai`
-- **PDF path:** Default PDF at `pdfs/thinkpython2.pdf`
-- **Ollama/OpenAI models:** Set model names and API keys as needed
-- **Langfuse:** Set `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` in `.env`
-
-You can copy `.env.example` to `.env` and fill in your own values:
-
-```bash
-cp .env.example .env
-```
-
-**Key variables:**
-
-- `PROVIDER` — Choose `ollama` or `openai` for LLM and embedding provider.
-- `ENABLE_METRICS` — Set to `true` to enable Prometheus metrics endpoint.
-- `TEXT_SPLITTER__CHUNK_SIZE` — Number of characters per text chunk (default: 500).
-- `TEXT_SPLITTER__CHUNK_OVERLAP` — Overlap between chunks (default: 50).
-- `LANGFUSE__PUBLIC_KEY`, `LANGFUSE__SECRET_KEY`, `LANGFUSE__HOST` — [Langfuse](https://langfuse.com/) tracing credentials.
-- `OLLAMA__HOST`, `OLLAMA__EMBEDDING_MODEL`, `OLLAMA__CHAT_MODEL`, `OLLAMA__TEMPERATURE` — Ollama settings.
-- `OPENAI__API_KEY`, `OPENAI__EMBEDDING_MODEL`, `OPENAI__CHAT_MODEL`, `OPENAI__TEMPERATURE` — OpenAI settings.
-
-**Example:**
-
-```env
-PROVIDER=ollama
-ENABLE_METRICS=true
-
-TEXT_SPLITTER__CHUNK_SIZE=500
-TEXT_SPLITTER__CHUNK_OVERLAP=50
-
-LANGFUSE__PUBLIC_KEY=your-public-key
-LANGFUSE__SECRET_KEY=your-secret-key
-LANGFUSE__HOST=https://us.cloud.langfuse.com
-
-OLLAMA__HOST=http://localhost:11535
-OLLAMA__EMBEDDING_MODEL=nomic-embed-text
-OLLAMA__CHAT_MODEL=llama3:8b
-OLLAMA__TEMPERATURE=0.5
-
-OPENAI__API_KEY=your-openai-key
-OPENAI__EMBEDDING_MODEL=text-embedding-ada-002
-OPENAI__CHAT_MODEL=gpt-4
-OPENAI__TEMPERATURE=0.5
-```
-
-See [`.env.example`](.env.example) for all available options.
 
 ---
 
