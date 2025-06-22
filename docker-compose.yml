@@ -11,7 +11,7 @@ services:
     volumes:
       - .:/rag-api
     working_dir: /rag-api
-    command: uvicorn app.api:app --host 0.0.0.0 --port 8008 --reload --log-level info --log-config uvicorn_log_conf.yml
+    command: uvicorn app.api:app --host 0.0.0.0 --port 8008 --workers 1 --log-level info --log-config logging_config.ini
     depends_on:
       - rag-chroma
       - rag-api-ollama
