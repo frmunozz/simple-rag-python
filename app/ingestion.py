@@ -42,10 +42,10 @@ class Ingest:
 
     def _get_document_id(self, document: Document):
         content_hash = md5(document.page_content.encode("utf-8")).hexdigest()
-        meta_hash = md5(
-            json.dumps(document.metadata, sort_keys=True).encode("utf-8")
-        ).hexdigest()
-        return f"{content_hash}-{meta_hash}"
+        # meta_hash = md5(
+        #     json.dumps(document.metadata, sort_keys=True).encode("utf-8")
+        # ).hexdigest()
+        return content_hash
 
     async def pdf_loader_pages(self, pdf_path: str|None = None, cleanup: bool = False):
         self.logger.debug(f"input pdf_path: {pdf_path}", extra={"pdf_path": pdf_path})
