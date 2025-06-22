@@ -10,6 +10,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from hashlib import md5
 import logging
+from pathlib import Path
 
 
 class SimilaritySearchResult(TypedDict):
@@ -49,6 +50,17 @@ class Ingest:
                 SETTINGS.package_root_directory, "chroma_data"
             ),
         )
+        self.last_file_hash: str = ""
+
+    def validate_file(self, pdf_path: str | None = None):
+        self.logger.debug(f"input pdf_path: {pdf_path}", extra={"pdf_path": pdf_path})
+        pdf_path = pdf_path if pdf_path is not None else SETTINGS.pdf_path
+        self.logger.info(f"loading pdf: {pdf_path}", extra={"pdf_path": pdf_path})
+        self.logger.info(f"current file_hash: {self.last_file_hash}", extra={"file_hash": self.last_file_hash})
+        # validate that file has changed since last ingestion
+        file_hash = md5(Path(pdf_path).read_bytes()).hexdigest()
+        self.logger.info(f"new file_hash: {file_hash}", extra={"file_hash": file_hash})
+        return file_hash != self.last_file_hash, pdf_path
 
     def _get_embeddings_model(self):
         """
@@ -88,7 +100,7 @@ class Ingest:
         return content_hash
 
     async def pdf_loader_pages(
-        self, pdf_path: str | None = None, cleanup: bool = False
+        self, pdf_path: str, cleanup: bool = False
     ):
         """
         Loads a PDF file, pages it, and yields each page as a Document
@@ -105,10 +117,15 @@ class Ingest:
         :yield: A Document object representing a page in the PDF.
         :rtype: Iterator[Document]
         """
-       
-        self.logger.debug(f"input pdf_path: {pdf_path}", extra={"pdf_path": pdf_path})
-        pdf_path = pdf_path if pdf_path is not None else SETTINGS.pdf_path
-        self.logger.info(f"loading pdf: {pdf_path}", extra={"pdf_path": pdf_path})
+        # validate that file has changed since last ingestion
+        file_hash = md5(Path(pdf_path).read_bytes()).hexdigest()
+        if file_hash == self.last_file_hash:
+            self.logger.info("file has not changed since last ingestion")
+            return
+        # update file_hash and reset chroma
+        self.logger.info("file has changed since last ingestion, updating file_hash and resetting vectorstore collection")
+        self.last_file_hash = file_hash
+        self.chroma.reset_collection()
         with self.langfuse.start_as_current_span(name="pdf loading") as span:
             loader = PyPDFLoader(pdf_path)
             async for page in loader.alazy_load():
@@ -124,7 +141,7 @@ class Ingest:
                 )
 
     async def pdf_loader_overlapping_pages(
-        self, pdf_path: str | None = None, cleanup: bool = False
+        self, pdf_path: str, cleanup: bool = False
     ):
         """
         Loads a PDF file, pages it, and yields each page as a Document
@@ -146,7 +163,7 @@ class Ingest:
         :rtype: Iterator[Tuple[Document, str | None]]
         """
         prev_page: Document | None = None
-        async for page in self.pdf_loader_pages(pdf_path=pdf_path, cleanup=cleanup):
+        async for page in self.pdf_loader_pages(pdf_path, cleanup=cleanup):
             _prev_page_label: str | None = None
             if prev_page is not None:
                 _page_content = (
@@ -196,7 +213,7 @@ class Ingest:
         return chunks
 
     async def direct_ingest_pdf(
-        self, pdf_path: str | None = None, cleanup: bool = False
+        self, pdf_path: str, cleanup: bool = False
     ):
         """
         Loads a PDF file and adds it to the ChromaDB database.
@@ -217,7 +234,7 @@ class Ingest:
                 documents = [
                     page
                     async for page in self.pdf_loader_pages(
-                        pdf_path=pdf_path, cleanup=cleanup
+                        pdf_path, cleanup=cleanup
                     )
                 ]
                 # use ids to prevent repeating embeddings for same pages
@@ -241,7 +258,7 @@ class Ingest:
                 raise e
 
     async def chunking_ingest_pdf(
-        self, pdf_path: str | None = None, cleanup: bool = False
+        self, pdf_path: str, cleanup: bool = False
     ):
         """
         Loads a PDF file, chunks it into overlapping pages, and ingests each chunk
@@ -265,7 +282,7 @@ class Ingest:
             chunks: List[Document] = []
             try:
                 async for page, prev_page_label in self.pdf_loader_overlapping_pages(
-                    pdf_path=pdf_path, cleanup=cleanup
+                    pdf_path, cleanup=cleanup
                 ):
                     page_chunks = await self.chunking_document(page, prev_page_label)
                     chunks.extend(page_chunks)

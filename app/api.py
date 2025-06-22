@@ -34,7 +34,11 @@ async def lifespan(app: FastAPI):
     global instrumentator, ingestion, ingestion_lock, ingestion_task
     instrumentator.expose(app)
     logger.info("ingestion on startup")
-    await ingestion.chunking_ingest_pdf()
+    ok, pdf_path = ingestion.validate_file()
+    if not ok:
+        logger.info("ingestion on startup skipped, file not changed")
+    else:
+        await ingestion.chunking_ingest_pdf(pdf_path, cleanup=False)
     yield
     # close stuff
     #
@@ -80,7 +84,8 @@ async def ingest(file: UploadFile | None = None):
     global ingestion_task, ingestion_lock, ingestion
 
     if ingestion_lock.locked():
-        raise HTTPException(status_code=400, detail="Ingestion in progress")
+        logger.warning("Ingestion already in progress")
+        raise HTTPException(status_code=400, detail="Ingestion already in progress")
 
     async with ingestion_lock:
         if ingestion_task is not None and not ingestion_task.done():
@@ -103,6 +108,10 @@ async def ingest(file: UploadFile | None = None):
             finally:
                 # close file
                 file.file.close()
+        valid, pdf_path = ingestion.validate_file(pdf_path)
+        if not valid:
+            logger.warning("File has not changed since last ingestion, skipping...")
+            raise HTTPException(304, "File has not changed since last ingestion")
         ingestion_task = asyncio.create_task(ingestion.chunking_ingest_pdf(pdf_path))
         logger.info("Ingestion started correctly")
     return "OK"
