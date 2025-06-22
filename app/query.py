@@ -11,11 +11,21 @@ from langfuse.langchain import CallbackHandler
 
 class Query:
     def __init__(self, ingest: Ingest):
+        """
+        Initialize the Query class
+
+        :param ingest: An instance of the Ingest class
+        """
         self.logger = logging.getLogger("app.query")
         self.ingest = ingest
         self.chat = self._get_chat()
 
     def _get_chat(self) -> BaseChatModel:
+        """
+        Initialize a chat model based on the configured LLM provider.
+
+        :return: an instance of a BaseChatModel
+        """
         langfuse = Langfuse(
             public_key=SETTINGS.langfuse.public_key,
             secret_key=SETTINGS.langfuse.secret_key,
@@ -42,6 +52,13 @@ class Query:
             raise ValueError(f"Unsupported LLM provider: {SETTINGS.provider}")
 
     async def _query_with_sources(self, query: str, k=5) -> dict:
+        """
+        Query the LLM with a given query and the top k sources.
+
+        :param query: The query to ask the LLM
+        :param k: The number of sources to use (default is 5)
+        :return: A dictionary with keys 'answer' and 'sources', where 'answer' is the response from the LLM and 'sources' is a list of dictionaries with keys 'page' and 'text'.
+        """
         search_results = await self.ingest.similarity_search(query, k=5)
 
         sources_formatted = "\n".join(
@@ -64,4 +81,11 @@ class Query:
         return {"answer": response.content, "sources": search_results}
 
     async def query(self, query: str, k: int = 5) -> dict:
+        """
+        Query the LLM with a given query and the top k sources.
+
+        :param query: The query to ask the LLM
+        :param k: The number of sources to use (default is 5)
+        :return: A dictionary with keys 'answer' and 'sources', where 'answer' is the response from the LLM and 'sources' is a list of dictionaries with keys 'page' and 'text'.
+        """
         return await self._query_with_sources(query, k=k)
