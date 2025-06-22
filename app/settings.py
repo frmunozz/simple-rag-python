@@ -19,6 +19,11 @@ class LangfuseConfig(BaseModel):
     secret_key: str
     host: str
 
+class LLMConfig(BaseModel):
+    provider: str = "openai"
+    model: str = "gpt-4"
+    temperature: float = 0.7
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_nested_delimiter="__")
     package_root_directory: str = _package_root_directory
@@ -26,6 +31,7 @@ class Settings(BaseSettings):
     pdf_path: str = os.path.join(_package_root_directory, "pdfs", "vscodeInstallation.pdf")
     ollama: OllamaConfig
     enable_metrics: bool = False
+    llm: LLMConfig = LLMConfig()
 
     # required environment configurations
     openai_api_key: str
