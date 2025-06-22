@@ -15,7 +15,6 @@ class Query:
         self.ingest = ingest
         self.chat = self._get_chat()
 
-
     def _get_chat(self) -> BaseChatModel:
         langfuse = Langfuse(
             public_key=SETTINGS.langfuse.public_key,
@@ -29,7 +28,7 @@ class Query:
                 temperature=SETTINGS.llm.temperature,
                 streaming=True,
                 api_key=SETTINGS.openai_api_key,  # type: ignore
-                callbacks=[langfuse_callback]
+                callbacks=[langfuse_callback],
             )
         elif SETTINGS.llm.provider == "ollama":
             self.logger.info("Initializing Ollama LLM")
@@ -37,20 +36,20 @@ class Query:
                 model=SETTINGS.llm.model,
                 temperature=SETTINGS.llm.temperature,
                 base_url=SETTINGS.ollama.host,
-                callbacks=[langfuse_callback]
+                callbacks=[langfuse_callback],
             )
         else:
             raise ValueError(f"Unsupported LLM provider: {SETTINGS.llm.provider}")
 
     async def _query_with_sources(self, query: str, k=5) -> dict:
         search_results = await self.ingest.similarity_search(query, k=5)
-        
+
         sources_formatted = "\n".join(
-            f"- [Page {match['page']}]: {match['text']}..."
-            for match in search_results
+            f"- [Page {match['page']}]: {match['text']}..." for match in search_results
         )
-        
-        instructions = SystemMessage(content=f"""
+
+        instructions = SystemMessage(
+            content=f"""
         You MUST answer using ONLY these sources:
         {sources_formatted}
         
@@ -58,17 +57,11 @@ class Query:
         1. ALWAYS cite the exact page number like [Page X]
         1. If unsure, say "I couldn't find definitive information"
         2. Never invent facts outside the sources
-        """)
-        response = await self.chat.ainvoke([
-            instructions,
-            HumanMessage(content=query)
-        ])
+        """
+        )
+        response = await self.chat.ainvoke([instructions, HumanMessage(content=query)])
 
-        
-        return {
-            "answer": response.content,
-            "sources": search_results
-        }
+        return {"answer": response.content, "sources": search_results}
 
-    async def query(self, query: str, k:int=5) -> dict:
+    async def query(self, query: str, k: int = 5) -> dict:
         return await self._query_with_sources(query, k=k)

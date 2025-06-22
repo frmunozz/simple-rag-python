@@ -2,8 +2,12 @@ import logging
 import logging.config
 from .settings import SETTINGS
 import os
+
 # load the logging config before doing any other import
-logging.config.fileConfig(os.path.join(SETTINGS.package_root_directory, "logging_config.ini"), disable_existing_loggers=True)
+logging.config.fileConfig(
+    os.path.join(SETTINGS.package_root_directory, "logging_config.ini"),
+    disable_existing_loggers=True,
+)
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from contextlib import asynccontextmanager
@@ -18,9 +22,11 @@ from pydantic import BaseModel
 
 logger = logging.getLogger("app.api")
 
+
 class QueryRequest(BaseModel):
     question: str
     k: int = 5
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,6 +47,7 @@ async def lifespan(app: FastAPI):
                 pass
             ingestion_task = None
 
+
 app = FastAPI(lifespan=lifespan, title="RAG API", version="0.0.1")
 
 # CORS allow all
@@ -60,11 +67,13 @@ query_llm = Query(ingestion)
 # but if we want to run the API with more than 1 worker, we may need
 # to adapt this logic with a shared cache memory like redis.
 ingestion_lock = asyncio.Lock()
-ingestion_task: asyncio.Task|None = None
+ingestion_task: asyncio.Task | None = None
+
 
 @app.get("/health")
 async def health():
     return "OK"
+
 
 @app.post("/ingest")
 async def ingest(file: UploadFile | None = None):
@@ -72,20 +81,20 @@ async def ingest(file: UploadFile | None = None):
 
     if ingestion_lock.locked():
         raise HTTPException(status_code=400, detail="Ingestion in progress")
-    
+
     async with ingestion_lock:
         if ingestion_task is not None and not ingestion_task.done():
             logger.warning("Ingestion already in progress")
             raise HTTPException(409, "Ingestion already in progress")
         pdf_path = None
         if file is not None:
-            if file.filename is None or not file.filename.endswith('.pdf'):
+            if file.filename is None or not file.filename.endswith(".pdf"):
                 logger.warning("Only PDF files are supported")
                 raise HTTPException(400, "Only PDF files are supported")
-            
+
             try:
                 # Save to temp file
-                with NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                with NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                     shutil.copyfileobj(file.file, tmp)
                     pdf_path = tmp.name
             except Exception as e:
@@ -94,11 +103,10 @@ async def ingest(file: UploadFile | None = None):
             finally:
                 # close file
                 file.file.close()
-        ingestion_task = asyncio.create_task(
-            ingestion.chunking_ingest_pdf(pdf_path)
-        )
+        ingestion_task = asyncio.create_task(ingestion.chunking_ingest_pdf(pdf_path))
         logger.info("Ingestion started correctly")
     return "OK"
+
 
 @app.post("/query")
 async def query(query_request: QueryRequest):
