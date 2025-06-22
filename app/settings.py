@@ -42,9 +42,9 @@ class Settings(BaseSettings):
     enable_metrics: bool = False
     provider: Provider = Provider.ollama
 
-    text_splitter = TextSplitterConfig()
-    ollama = OllamaConfig()
-    openai = OpenaiConfig() # must define at least the api_key in .env file
+    text_splitter: TextSplitterConfig = TextSplitterConfig()
+    ollama: OllamaConfig = OllamaConfig()
+    openai: OpenaiConfig = OpenaiConfig() # must define at least the api_key in .env file
     langfuse: LangfuseConfig # must define all in .env file
 
 SETTINGS = Settings()  # type: ignore
