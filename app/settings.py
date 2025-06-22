@@ -1,7 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 import os
 from dotenv import load_dotenv
+from enum import Enum
 
 _package_root_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _dotenv_path = os.path.join(_package_root_directory, ".env")
@@ -9,41 +10,41 @@ load_dotenv(dotenv_path=_dotenv_path, override=True)
 
 
 class TextSplitterConfig(BaseModel):
-    chunk_size: int
-    chunk_overlap: int
+    chunk_size: int = 500
+    chunk_overlap: int = 50
 
 
 class OllamaConfig(BaseModel):
-    host: str
-    embedding_model: str
+    host: str = "http://localhost:11535"
+    embedding_model: str = "nomic-embed-text"
+    chat_model: str = "llama3:8b"
+    temperature: float = 0.5
 
+class OpenaiConfig(BaseModel):
+    api_key: SecretStr = SecretStr("SOME-API-KEY")
+    embedding_model: str = "text-embedding-ada-002"
+    chat_model: str = "gpt-4"
+    temperature: float = 0.5
 
 class LangfuseConfig(BaseModel):
     public_key: str
     secret_key: str
     host: str
 
-
-class LLMConfig(BaseModel):
-    provider: str = "openai"
-    model: str = "gpt-4"
-    temperature: float = 0.7
-
+class Provider(str, Enum):
+    ollama = "ollama"
+    openai = "openai"
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_nested_delimiter="__")
     package_root_directory: str = _package_root_directory
-    text_splitter: TextSplitterConfig = TextSplitterConfig(
-        chunk_size=500, chunk_overlap=50
-    )
     pdf_path: str = os.path.join(_package_root_directory, "pdfs", "thinkpython2.pdf")
-    ollama: OllamaConfig
     enable_metrics: bool = False
-    llm: LLMConfig = LLMConfig()
+    provider: Provider = Provider.ollama
 
-    # required environment configurations
-    openai_api_key: str
-    langfuse: LangfuseConfig
-
+    text_splitter = TextSplitterConfig()
+    ollama = OllamaConfig()
+    openai = OpenaiConfig() # must define at least the api_key in .env file
+    langfuse: LangfuseConfig # must define all in .env file
 
 SETTINGS = Settings()  # type: ignore

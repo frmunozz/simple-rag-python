@@ -3,7 +3,7 @@ from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings  # if doing local embedding with ollama
 from langchain_openai import OpenAIEmbeddings  # if using openai for embeddings
 from typing import List, TypedDict
-from .settings import SETTINGS
+from .settings import SETTINGS, Provider
 import os
 from langfuse import Langfuse
 from langchain_community.document_loaders import PyPDFLoader
@@ -29,9 +29,7 @@ class Ingest:
             chunk_size=SETTINGS.text_splitter.chunk_size,
             chunk_overlap=SETTINGS.text_splitter.chunk_overlap,
         )
-        self.embeddings = OllamaEmbeddings(
-            model=SETTINGS.ollama.embedding_model, base_url=SETTINGS.ollama.host
-        )
+        self.embeddings = self._get_embeddings_model()
         # self.embeddings = OpenAIEmbeddings(
         #     api_key=SETTINGS.openai_api_key # type: ignore
         # )
@@ -42,6 +40,20 @@ class Ingest:
                 SETTINGS.package_root_directory, "chroma_data"
             ),
         )
+
+    def _get_embeddings_model(self):
+        if SETTINGS.provider == Provider.openai:
+            return OpenAIEmbeddings(
+                model=SETTINGS.openai.embedding_model,
+                api_key=SETTINGS.openai.api_key,
+            )
+        elif SETTINGS.provider == Provider.ollama:
+            return OllamaEmbeddings(
+                model=SETTINGS.ollama.embedding_model, 
+                base_url=SETTINGS.ollama.host
+            )
+        else:
+            raise ValueError(f"Unsupported LLM provider: {SETTINGS.provider}")
 
     def _get_document_id(self, document: Document):
         content_hash = md5(document.page_content.encode("utf-8")).hexdigest()

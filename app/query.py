@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 from langchain.chat_models.base import BaseChatModel
 from langfuse import Langfuse
 import logging
-from .settings import SETTINGS
+from .settings import SETTINGS, Provider
 from .ingestion import Ingest
 from langchain_core.messages import HumanMessage, SystemMessage
 from langfuse.langchain import CallbackHandler
@@ -21,25 +21,25 @@ class Query:
             secret_key=SETTINGS.langfuse.secret_key,
         )
         langfuse_callback = CallbackHandler()
-        if SETTINGS.llm.provider == "openai":
+        if SETTINGS.provider == Provider.openai:
             self.logger.info("Initializing OpenAI LLM")
             return ChatOpenAI(
-                model=SETTINGS.llm.model,
-                temperature=SETTINGS.llm.temperature,
+                model=SETTINGS.openai.chat_model,
+                temperature=SETTINGS.openai.temperature,
                 streaming=True,
-                api_key=SETTINGS.openai_api_key,  # type: ignore
+                api_key=SETTINGS.openai.api_key,
                 callbacks=[langfuse_callback],
             )
-        elif SETTINGS.llm.provider == "ollama":
+        elif SETTINGS.provider == Provider.ollama:
             self.logger.info("Initializing Ollama LLM")
             return ChatOllama(
-                model=SETTINGS.llm.model,
-                temperature=SETTINGS.llm.temperature,
+                model=SETTINGS.ollama.chat_model,
+                temperature=SETTINGS.ollama.temperature,
                 base_url=SETTINGS.ollama.host,
                 callbacks=[langfuse_callback],
             )
         else:
-            raise ValueError(f"Unsupported LLM provider: {SETTINGS.llm.provider}")
+            raise ValueError(f"Unsupported LLM provider: {SETTINGS.provider}")
 
     async def _query_with_sources(self, query: str, k=5) -> dict:
         search_results = await self.ingest.similarity_search(query, k=5)
