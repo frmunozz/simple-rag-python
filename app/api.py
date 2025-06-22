@@ -10,20 +10,31 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from .ingestion import Ingest
-from .settings import SETTINGS
 import asyncio
+from tempfile import NamedTemporaryFile
+from typing import Annotated
+import shutil
+
+logger = logging.getLogger("app.api")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # expose general fastAPI metrics
-    global instrumentator, ingestion
+    global instrumentator, ingestion, ingestion_lock, ingestion_task
     instrumentator.expose(app)
-    t = asyncio.create_task(ingestion.chunking_ingest_pdf(SETTINGS.pdf_path))
+    logger.info("ingestion on startup")
+    await ingestion.chunking_ingest_pdf()
     yield
     # close stuff
     #
-    t.cancel()
-    await t
+    async with ingestion_lock:
+        if ingestion_task is not None:
+            ingestion_task.cancel()
+            try:
+                await ingestion_task
+            except:
+                pass
+            ingestion_task = None
 
 app = FastAPI(lifespan=lifespan, title="RAG API", version="0.0.1")
 
@@ -38,13 +49,48 @@ app.add_middleware(
 
 instrumentator = Instrumentator().instrument(app)
 ingestion = Ingest()
+# define an ingestion lock to prevent duplicated ingests
+# but if we want to run the API with more than 1 worker, we may need
+# to adapt this logic with a shared cache memory like redis.
+ingestion_lock = asyncio.Lock()
+ingestion_task: asyncio.Task|None = None
 
 @app.get("/health")
 async def health():
     return "OK"
 
 @app.post("/ingest")
-async def ingest():
+async def ingest(file: UploadFile | None = None):
+    global ingestion_task, ingestion_lock, ingestion
+
+    if ingestion_lock.locked():
+        raise HTTPException(status_code=400, detail="Ingestion in progress")
+    
+    async with ingestion_lock:
+        if ingestion_task is not None and not ingestion_task.done():
+            logger.warning("Ingestion already in progress")
+            raise HTTPException(409, "Ingestion already in progress")
+        pdf_path = None
+        if file is not None:
+            if file.filename is None or not file.filename.endswith('.pdf'):
+                logger.warning("Only PDF files are supported")
+                raise HTTPException(400, "Only PDF files are supported")
+            
+            try:
+                # Save to temp file
+                with NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                    shutil.copyfileobj(file.file, tmp)
+                    pdf_path = tmp.name
+            except Exception as e:
+                logger.error(f"Failed to save file: {e}")
+                raise HTTPException(500, f"Failed to save file: {e}")
+            finally:
+                # close file
+                file.file.close()
+        ingestion_task = asyncio.create_task(
+            ingestion.chunking_ingest_pdf(pdf_path)
+        )
+        logger.info("Ingestion started correctly")
     return "OK"
 
 @app.post("/query")
