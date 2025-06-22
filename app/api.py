@@ -1,4 +1,11 @@
-from fastapi import FastAPI
+import logging
+import logging.config
+from .settings import SETTINGS
+import os
+# load the logging config before doing any other import
+logging.config.fileConfig(os.path.join(SETTINGS.package_root_directory, "logging_config.ini"), disable_existing_loggers=True)
+
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
