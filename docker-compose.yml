@@ -47,7 +47,7 @@ services:
 
   rag-api-ollama:
     container_name: rag-api-ollama
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.6.1
     ports:
       - "11535:11434"  # Ollama's default port
     volumes:
