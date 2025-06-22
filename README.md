@@ -27,6 +27,8 @@ docker compose exec rag-api-ollama ollama pull llama3:8b
 
 ### Run services
 
+#### Docker compose
+
 ```bash
 docker compose up
 ```
@@ -38,6 +40,25 @@ Verify Ollama is running:
 ```bash
 curl http://localhost:11535/api/tags
 ```
+
+#### Running Locally
+
+Run services for ChromaDB and Ollama
+
+```bash
+docker compose up -d rag-chroma rag-api-ollama
+```
+
+Make sure to set the environment variable `OLLAMA__HOST` to `http://localhost:11535`. Then prepare the virutal environment, install dependiencies and run uvicorn.
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.api:app --host 0.0.0.0 --port 8008 --reload --log-level info --log-config logging_config.ini
+```
+
+Note: Depending on your local configuration of Docker, you may need to remove or change permissions of log file (`app.log`)
 
 ---
 
@@ -142,6 +163,7 @@ See [`.env.example`](.env.example) for all available options.
 - Images inside pages are ignored
 - Extremely large PDFs (>1GB) may cause issues
 - Redundant text (headers, footers, references) may affect results
+- API does not have memory from previous executions, which mean that on each start the API will re-ingest the PDF file.
 
 ---
 
