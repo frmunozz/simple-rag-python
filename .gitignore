@@ -198,3 +198,9 @@ cython_debug/
 
 # ignore sqlite3 files
 *.sqlite3
+
+# ignore chroma data
+chroma_data/
+
+# ignore ollama data
+ollama_data/
