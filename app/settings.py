@@ -23,9 +23,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_nested_delimiter="__")
     package_root_directory: str = _package_root_directory
     text_splitter: TextSplitterConfig = TextSplitterConfig(chunk_size=500, chunk_overlap=50)
-    pdf_path: str = os.path.join(_package_root_directory, "pdfs", "thinkpython2.pdf")
-    ollama: OllamaConfig = OllamaConfig(host="http://rag-api-ollama:11434", embedding_model="nomic-embed-text")
-    
+    pdf_path: str = os.path.join(_package_root_directory, "pdfs", "vscodeInstallation.pdf")
+    ollama: OllamaConfig
+    enable_metrics: bool = False
+
     # required environment configurations
     openai_api_key: str
     langfuse: LangfuseConfig
