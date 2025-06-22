@@ -5,13 +5,8 @@ from langfuse import Langfuse
 import logging
 from .settings import SETTINGS
 from .ingestion import Ingest
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage, SystemMessage
 from langfuse.langchain import CallbackHandler
-from langchain.tools import Tool
-from langchain_chroma import Chroma
-from typing import List, Dict
 
 
 class Query:

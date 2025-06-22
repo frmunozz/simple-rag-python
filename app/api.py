@@ -13,7 +13,6 @@ from .ingestion import Ingest
 from .query import Query
 import asyncio
 from tempfile import NamedTemporaryFile
-from typing import Annotated
 import shutil
 from pydantic import BaseModel
 
