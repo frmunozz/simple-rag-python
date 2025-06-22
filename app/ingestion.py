@@ -10,6 +10,8 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from hashlib import md5
 import json
+import logging
+
 
 
 class Ingest:
@@ -19,6 +21,7 @@ class Ingest:
             secret_key=SETTINGS.langfuse.secret_key,
             host=SETTINGS.langfuse.host,
         )
+        self.logger = logging.getLogger("app.ingest")
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=SETTINGS.text_splitter.chunk_size,
             chunk_overlap=SETTINGS.text_splitter.chunk_overlap,
@@ -44,32 +47,36 @@ class Ingest:
         ).hexdigest()
         return f"{content_hash}-{meta_hash}"
 
-    async def pdf_loader_pages(self, pdf_path: str|None = None):
+    async def pdf_loader_pages(self, pdf_path: str|None = None, cleanup: bool = False):
+        self.logger.debug(f"input pdf_path: {pdf_path}", extra={"pdf_path": pdf_path})
         pdf_path = pdf_path if pdf_path is not None else SETTINGS.pdf_path
+        self.logger.info(f"loading pdf: {pdf_path}", extra={"pdf_path": pdf_path})
         with self.langfuse.start_as_current_span(name="pdf loading") as span:
             loader = PyPDFLoader(pdf_path)
             async for page in loader.alazy_load():
                 yield page
+        
+        if cleanup and pdf_path != SETTINGS.pdf_path:
+            try:
+                os.remove(pdf_path)
+            except Exception as e:
+                # catch it and log the error
+                self.logger.error(f"Failed to remove file: {e}", extra={"pdf_path": pdf_path})
 
-    async def pdf_loader_overlapping_pages(self, pdf_path: str|None = None):
-        pdf_path = pdf_path if pdf_path is not None else SETTINGS.pdf_path
-        with self.langfuse.start_as_current_span(
-            name="pdf loading", input=pdf_path
-        ) as span:
-            loader = PyPDFLoader(pdf_path)
-            prev_page: Document | None = None
-            async for page in loader.alazy_load():
-                _prev_page_label: str | None = None
-                if prev_page is not None:
-                    _page_content = (
-                        prev_page.page_content[-SETTINGS.text_splitter.chunk_overlap :]
-                        + page.page_content
-                    )
-                    _prev_page_label = str(prev_page.metadata["page_label"])
-                else:
-                    _page_content = page.page_content
-                yield Document(_page_content, metadata=page.metadata), _prev_page_label
-                prev_page = page
+    async def pdf_loader_overlapping_pages(self, pdf_path: str|None = None, cleanup: bool = False):
+        prev_page: Document | None = None
+        async for page in self.pdf_loader_pages(pdf_path=pdf_path, cleanup=cleanup):
+            _prev_page_label: str | None = None
+            if prev_page is not None:
+                _page_content = (
+                    prev_page.page_content[-SETTINGS.text_splitter.chunk_overlap :]
+                    + page.page_content
+                )
+                _prev_page_label = str(prev_page.metadata["page_label"])
+            else:
+                _page_content = page.page_content
+            yield Document(_page_content, metadata=page.metadata), _prev_page_label
+            prev_page = page
 
     async def chunking_document(
         self, document: Document, prev_page_label: str | None = None
@@ -92,43 +99,42 @@ class Ingest:
             chunks.append(Document(content_chunk, metadata=_metadata))
         return chunks
 
-    async def direct_ingest_pdf(self, pdf_path: str|None = None, cleanup: bool = True):
+    async def direct_ingest_pdf(self, pdf_path: str|None = None, cleanup: bool = False):
         with self.langfuse.start_as_current_span(
             name="ingest", input="direct_ingest_pdf"
         ) as span:
             try:
-                documents = [page async for page in self.pdf_loader_pages(pdf_path=pdf_path)]
+                documents = [page async for page in self.pdf_loader_pages(pdf_path=pdf_path, cleanup=cleanup)]
                 # use ids to prevent repeating embeddings for same pages
                 document_ids = [self._get_document_id(doc) for doc in documents]
+                self.logger.info(
+                    f"ingesting {len(documents)} chunks", extra={"n_chunks": len(documents)})
                 with self.langfuse.start_as_current_generation(
                     name="documment embedding",
                     input={"num_documents": len(documents)},
                 ) as gen:
                     await self.chroma.aadd_documents(documents, ids=document_ids)
+                self.logger.info(
+                    f"ingested {len(documents)} chunks", extra={"n_chunks": len(documents)})
                 span.update(output="OK")
             except Exception as e:
                 span.update(output=f"Error: {e}")
-        
-        if cleanup and pdf_path is not None:
-            try:
-                os.remove(pdf_path)
-            except Exception as e:
-                # catch it and log the error
-                pass
+                raise e
 
-    async def chunking_ingest_pdf(self, pdf_path: str|None = None, cleanup: bool = True):
+    async def chunking_ingest_pdf(self, pdf_path: str|None = None, cleanup: bool = False):
         with self.langfuse.start_as_current_span(
             name="ingest", input="chunking_ingest_pdf"
         ) as span:
             chunks: List[Document] = []
             try:
                 async for page, prev_page_label in self.pdf_loader_overlapping_pages(
-                    pdf_path=pdf_path
+                    pdf_path=pdf_path, cleanup=cleanup
                 ):
                     page_chunks = await self.chunking_document(page, prev_page_label)
                     chunks.extend(page_chunks)
                 chunk_ids = [self._get_document_id(chunk) for chunk in chunks]
-
+                self.logger.info(
+                    f"ingesting {len(chunks)} chunks", extra={"n_chunks": len(chunks)})
                 with self.langfuse.start_as_current_generation(
                     name="documment embedding",
                     input={
@@ -137,16 +143,14 @@ class Ingest:
                     },
                 ) as gen:
                     await self.chroma.aadd_documents(chunks, ids=chunk_ids)
+                self.logger.info(
+                    f"ingested {len(chunks)} chunks", extra={"n_chunks": len(chunks)}
+                )
                 span.update(output="OK")
             except Exception as e:
                 span.update(output=f"Error: {e}")
-
-        if cleanup and pdf_path is not None:
-            try:
-                os.remove(pdf_path)
-            except Exception as e:
-                # catch it and log the error
-                pass
+                self.logger.error(f"Error: {e}", extra={"pdf_path": pdf_path, "cleanup": cleanup})
+                raise e
 
     async def streaming_chunking_ingest_pdf(self, pdf_path: str):
         """
