@@ -9,3 +9,16 @@ httpx
 pytest-asyncio
 pyyaml
 prometheus_fastapi_instrumentator
+structlog
+langchain
+langchain-community
+langchain-openai
+langchain-text-splitters
+openai
+langfuse
+chromadb
+langchain-ollama
+langchain-chroma
+python-multipart
+python-json-logger
+colorlog
