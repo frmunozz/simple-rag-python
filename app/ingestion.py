@@ -2,16 +2,19 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings  # if doing local embedding with ollama
 from langchain_openai import OpenAIEmbeddings  # if using openai for embeddings
-from typing import List
+from typing import List, TypedDict
 from .settings import SETTINGS
 import os
 from langfuse import Langfuse
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from hashlib import md5
-import json
 import logging
 
+
+class SimilaritySearchResult(TypedDict):
+    text: str
+    page: str
 
 
 class Ingest:
@@ -158,3 +161,16 @@ class Ingest:
                 so we can stream the pdf to the vector db in batches, optimizing memory usage.
         """
         raise NotImplementedError()
+    
+    async def similarity_search(self, query: str, k: int =3) -> List[SimilaritySearchResult]:
+        """Retrieves similarity search matches from ChromaDB."""
+        with self.langfuse.start_as_current_span(name="similarity search", input=query) as span:
+            results = await self.chroma.asimilarity_search(query, k=k)
+            result_formatted = [
+                SimilaritySearchResult(
+                    text=doc.page_content, page=str(doc.metadata.get("page_label", doc.metadata.get("page", "N/A")))
+                )
+                for doc in results
+            ]
+            span.update(output=result_formatted)
+            return result_formatted
