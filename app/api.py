@@ -10,12 +10,18 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from .ingestion import Ingest
+from .query import Query
 import asyncio
 from tempfile import NamedTemporaryFile
 from typing import Annotated
 import shutil
+from pydantic import BaseModel
 
 logger = logging.getLogger("app.api")
+
+class QueryRequest(BaseModel):
+    question: str
+    k: int = 5
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,6 +55,8 @@ app.add_middleware(
 
 instrumentator = Instrumentator().instrument(app)
 ingestion = Ingest()
+query_llm = Query(ingestion)
+
 # define an ingestion lock to prevent duplicated ingests
 # but if we want to run the API with more than 1 worker, we may need
 # to adapt this logic with a shared cache memory like redis.
@@ -94,5 +102,9 @@ async def ingest(file: UploadFile | None = None):
     return "OK"
 
 @app.post("/query")
-async def query():
-    return
+async def query(query_request: QueryRequest):
+    try:
+        return await query_llm.query(query_request.question, k=query_request.k)
+    except Exception as e:
+        logger.error(f"Failed to query: {e}")
+        raise HTTPException(500, f"Failed to query: {e}")
