@@ -1,9 +1,11 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import BaseModel
 import os
+from dotenv import load_dotenv
 
 _package_root_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
+_dotenv_path=os.path.join(_package_root_directory, ".env")
+load_dotenv(dotenv_path=_dotenv_path, override=True)
 class TextSplitterConfig(BaseModel):
     chunk_size: int
     chunk_overlap: int
