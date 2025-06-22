@@ -36,7 +36,6 @@ services:
       - 8000:8000
     volumes:
       - ./chroma_data:/chroma/chroma
-      - ./uvicorn_log_conf.yml:/chroma/chromadb/log_config.yml
     environment:
       - IS_PERSISTENT=TRUE
       - PERSIST_DIRECTORY=/chroma/chroma
