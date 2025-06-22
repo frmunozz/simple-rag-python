@@ -22,6 +22,7 @@ It provides endpoints for PDF ingestion and question answering over the ingested
 ```bash
 docker compose up -d rag-api-ollama
 docker compose exec rag-api-ollama ollama pull nomic-embed-text
+docker compose exec rag-api-ollama ollama pull llama3:8b
 ```
 
 ### Run services
